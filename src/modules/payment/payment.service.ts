@@ -77,12 +77,14 @@ export class PaymentService {
       this.logger.log(
         `Payment successfully processed for booking: ${bookingId}`,
       );
-    } catch (error) {
+    } catch (error: unknown) {
       await queryRunner.rollbackTransaction();
-      this.logger.error(
-        `Error processing payment for booking: ${bookingId}`,
-        error.stack,
-      );
+      if (error instanceof Error){
+        this.logger.error(
+          `Error processing payment for booking: ${bookingId}`,
+          error.stack,
+        );
+      }
       throw error;
     } finally {
       await queryRunner.release();
