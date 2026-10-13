@@ -30,6 +30,7 @@ import { PaymentModule } from './modules/payment/payment.module';
     PaymentModule,
   ],
   controllers: [AppController],
+
   providers: [AppService],
 })
 export class AppModule {}
