@@ -14,28 +14,59 @@ export class PaymentService {
   constructor(private readonly datasource: DataSource) {}
 
   async processBookingPayment(payload: ProcessPaymentDto): Promise<void> {
-    const { eventId, bookingId, userId, amount, currency, idempotencyKey } =
+    const { eventId, bookingId, userId, totalPrice, currency, idempotencyKey } =
       payload;
 
     const queryRunner = this.datasource.createQueryRunner();
     await queryRunner.connect();
-    await queryRunner.startTransaction();
 
     try {
-      const existingEvent = await queryRunner.manager.findOne(
-        ProcessedEventEntity,
-        {
-          where: { eventId },
-        },
-      );
+      await queryRunner.startTransaction();
 
-      if (existingEvent) {
-        this.logger.warn(`Event ${eventId} already processed. Skipping.`);
-        await queryRunner.rollbackTransaction();
+      const result = await queryRunner.manager
+        .createQueryBuilder()
+        .insert()
+        .into(ProcessedEventEntity)
+        .values({
+          eventId,
+          eventType: 'booking.creat',
+        })
+        .orIgnore()
+        .returning('event_id')
+        .execute();
+
+      if (Array.isArray(result.raw)) {
+        const numberResult = result.raw.length;
+        if (numberResult === 0) {
+          this.logger.warn(`Duplicate event ignored: ${eventId}`);
+          await queryRunner.commitTransaction();
+          return;
+        }
+      }
+
+      const existingPayment = await queryRunner.manager.findOne(PaymentEntity, {
+        where: { bookingId },
+      });
+
+      if (existingPayment) {
+        if (
+          existingPayment.userId !== userId ||
+          existingPayment.idempotencyKey !== idempotencyKey ||
+          existingPayment.amount !== totalPrice.toFixed(2) ||
+          existingPayment.currency.trim() !== currency
+        ) {
+          throw new Error(
+            `Conflicting payment request for booking ${bookingId}`,
+          );
+        }
+
+        this.logger.warn(`Payment already exists for booking: ${bookingId}`);
+
+        await queryRunner.commitTransaction();
         return;
       }
 
-      const isSuccess = amount > 0;
+      const isSuccess = totalPrice > 0;
       const status = isSuccess
         ? PaymentStatusEnum.SUCCESS
         : PaymentStatusEnum.FAILED;
@@ -43,11 +74,11 @@ export class PaymentService {
       const payment = queryRunner.manager.create(PaymentEntity, {
         bookingId,
         userId,
-        amount: amount.toString(),
+        amount: totalPrice.toFixed(2),
         currency,
         status,
         idempotencyKey,
-        failureReason: isSuccess ? null : 'INVALID_AMOUNT',
+        failureReason: isSuccess ? null : 'PAYMENT_FAILED',
       });
 
       const savedPayment = await queryRunner.manager.save(payment);
@@ -59,32 +90,32 @@ export class PaymentService {
         payload: {
           paymentId: savedPayment.id,
           bookingId: savedPayment.bookingId,
+          userId: savedPayment.userId,
+          amount: savedPayment.amount,
+          currency: savedPayment.currency,
           status: savedPayment.status,
         },
         status: OutboxStatusEnum.PENDING,
+        retryCount: 0,
       });
 
       await queryRunner.manager.save(outboxEvent);
 
-      const processEvent = queryRunner.manager.create(ProcessedEventEntity, {
-        eventId,
-        eventType: 'booking.created',
-      });
-
-      await queryRunner.manager.save(processEvent);
-
       await queryRunner.commitTransaction();
+
       this.logger.log(
         `Payment successfully processed for booking: ${bookingId}`,
       );
     } catch (error: unknown) {
-      await queryRunner.rollbackTransaction();
-      if (error instanceof Error) {
-        this.logger.error(
-          `Error processing payment for booking: ${bookingId}`,
-          error.stack,
-        );
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
       }
+
+      this.logger.error(
+        `Payment processing fail for booking: ${bookingId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+
       throw error;
     } finally {
       await queryRunner.release();
