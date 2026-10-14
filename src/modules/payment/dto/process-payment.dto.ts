@@ -4,6 +4,9 @@ import {
   IsPositive,
   IsString,
   IsUUID,
+  Matches,
+  Max,
+  MaxLength,
 } from 'class-validator';
 
 export class ProcessPaymentDto {
@@ -19,15 +22,23 @@ export class ProcessPaymentDto {
   @IsNotEmpty()
   userId!: string;
 
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
-  amount!: number;
+  @Max(99999999.99)
+  totalPrice!: number;
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[A-Z]{3}$/, {
+    message: 'Currency must be a 3-letter uppercase code',
+  })
   currency!: string;
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/\S/, {
+    message: 'Idempotency key cannot be blank',
+  })
+  @MaxLength(255)
   idempotencyKey!: string;
 }
