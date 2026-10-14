@@ -27,7 +27,7 @@ export class PaymentEntity {
   @Column({
     type: 'enum',
     enum: PaymentStatusEnum,
-    default: PaymentStatusEnum.PENDING,
+    default: PaymentStatusEnum.PENDING_PAYMENT,
   })
   status: PaymentStatusEnum;
 
