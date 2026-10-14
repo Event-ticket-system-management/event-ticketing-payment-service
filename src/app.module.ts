@@ -7,10 +7,12 @@ import { PaymentEntity } from './modules/payment/entities/payment.entity';
 import { ProcessedEventEntity } from './modules/payment/entities/process-event.entity';
 import { OutboxEventEntity } from './modules/payment/entities/outbox-event.entity';
 import { PaymentModule } from './modules/payment/payment.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
