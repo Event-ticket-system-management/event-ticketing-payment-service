@@ -14,10 +14,18 @@
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
+    "test:controller": "jest --runInBand controller-unit-tests",
+    "test:service": "jest --runInBand service-unit-tests",
+    "test:integration": "jest --config ./test/integration-tests/jest-integration.json --runInBand",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "typeorm": "typeorm-ts-node-commonjs",
+    "migration:generate": "npm run typeorm -- migration:generate src/database/migrations/InitialPaymentSchema -d src/database/data-source.ts",
+    "migration:run": "npm run typeorm -- migration:run -d src/database/data-source.ts",
+    "migration:revert": "npm run typeorm -- migration:revert -d src/database/data-source.ts",
+    "migration:show": "npm run typeorm -- migration:show -d src/database/data-source.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -25,7 +33,10 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/microservices": "^11.2.6",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^12.0.2",
     "@nestjs/typeorm": "^12.0.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
     "kafkajs": "^2.2.4",
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
@@ -63,15 +74,32 @@
       "json",
       "ts"
     ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
+    "rootDir": ".",
+    "testMatch": [
+      "<rootDir>/test/controller-unit-tests/**/*.spec.ts",
+      "<rootDir>/test/service-unit-tests/**/*.spec.ts"
     ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "transform": {
+      "^.+\\.[cm]?[tj]s$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "allowJs": true
+          }
+        }
+      ]
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(?:@nestjs/config|@nestjs/schedule)/)"
+    ],
+    "testEnvironment": "node",
+    "clearMocks": true,
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.spec.ts",
+      "!src/main.ts",
+      "!src/database/migrations/**"
+    ],
+    "coverageDirectory": "<rootDir>/coverage"
   }
 }

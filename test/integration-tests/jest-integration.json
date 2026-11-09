@@ -1,0 +1,22 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "../..",
+  "testMatch": ["<rootDir>/test/integration-tests/**/*.integration-spec.ts"],
+  "transform": {
+    "^.+\\.[cm]?[tj]s$": [
+      "ts-jest",
+      {
+        "tsconfig": {
+          "allowJs": true
+        }
+      }
+    ]
+  },
+  "transformIgnorePatterns": [
+    "node_modules/(?!(?:@nestjs/config|@nestjs/schedule)/)"
+  ],
+  "testEnvironment": "node",
+  "testTimeout": 30000,
+  "clearMocks": true,
+  "verbose": true
+}

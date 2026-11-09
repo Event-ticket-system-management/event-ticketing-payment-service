@@ -1,0 +1,100 @@
+name: Event Payment CI Pipeline
+
+on:
+  pull_request:
+    branches: ["develop", "main"]
+  push:
+    branches: ["develop"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build, Unit Test & Integration Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_payment_test_password
+          POSTGRES_DB: payment_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d payment_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      TEST_DATABASE_URL: postgresql://postgres:ci_payment_test_password@localhost:5432/payment_test
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build NestJS application
+        run: npm run build
+
+      - name: Prepare test reports directory
+        run: mkdir -p test-reports
+
+      - name: Run Controller Unit Tests
+        run: npm run test:controller -- --json --outputFile=test-reports/controller-tests.json
+
+      - name: Run Service Unit Tests
+        run: npm run test:service -- --json --outputFile=test-reports/service-tests.json
+
+      - name: Run PostgreSQL Integration Tests
+        run: npm run test:integration -- --json --outputFile=test-reports/integration-tests.json
+
+      - name: Generate Unit Test Coverage
+        run: npm run test:cov -- --runInBand
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify Docker Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: event-ticketing-payment-service:ci-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload Test Result Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: payment-service-test-reports
+          path: test-reports/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload Coverage Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: payment-service-coverage
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: warn
