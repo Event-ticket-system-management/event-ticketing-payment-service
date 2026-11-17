@@ -26,7 +26,6 @@ export class PaymentEventProducer implements OnModuleInit, OnModuleDestroy {
     eventId: string,
     payload: Record<string, unknown>,
   ): Promise<void> {
-    console.log('Hello');
     await this.producer.send({
       topic,
       acks: -1,

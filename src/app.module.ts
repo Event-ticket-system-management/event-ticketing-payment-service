@@ -8,6 +8,7 @@ import { ProcessedEventEntity } from './modules/payment/entities/process-event.e
 import { OutboxEventEntity } from './modules/payment/entities/outbox-event.entity';
 import { PaymentModule } from './modules/payment/payment.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ScheduleModule } from '@nestjs/schedule';
       }),
     }),
     PaymentModule,
+    HealthModule,
   ],
   controllers: [AppController],
 
